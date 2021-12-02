@@ -1,44 +1,53 @@
 package com.example.quizzesapi
 
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.stereotype.Repository
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
 // import org.springframework.web.bind.annotation.RequestMethod
 import java.util.*
+import javax.persistence.Entity
+import javax.persistence.Id
 import javax.validation.Valid
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull
 import javax.validation.constraints.Size
 
-//cria categoria
-data class Category(val id: UUID = UUID.randomUUID(), val name: String)
 
-//cria lista de categorias
-val categories = mutableListOf<Category>()
+@Entity
+data class Category(
+    @Id
+    val id: UUID = UUID.randomUUID(),
+    val name: String
+)
+@Repository
+interface CategoryRepository : JpaRepository<Category, UUID>{
+    fun existsByName(name: String): Boolean
+    fun existsByNameAndIdNot(name: String, id:UUID): Boolean
+}
 
-//cria obj categoria através do imput
 data class CategoryReq(
     @field:[NotNull NotBlank Size(min = 3, max = 20)]
     val name: String
 )
 
-//cria rotas para categories
 @RestController
-@RequestMapping("categories") //mapeia /categories para CategoryController
-class CategoryController{
-    //
-    //@RequestMapping(method = [RequestMethod.GET]) //se o método em categories for GET
-    @GetMapping //RequestMapping para GET
-    fun index() = ResponseEntity.ok(categories) //devolve uma lista mutavel de categorias
+@RequestMapping("categories")
+class CategoryController(val categoryRepository: CategoryRepository){
+
+    @GetMapping
+    fun index() = ResponseEntity.ok(categoryRepository.findAll())
 
     @PostMapping
     fun create(@Valid @RequestBody categoryReq: CategoryReq): ResponseEntity<Category> {
-        if(categories.any { it.name == categoryReq.name })
+        if(categoryRepository.existsByName(categoryReq.name))
             throw ResponseStatusException(HttpStatus.CONFLICT, "Category already exists")
 
         val category = Category(name = categoryReq.name)
-        categories.add(category)
+        categoryRepository.save(category)
         return ResponseEntity(category, HttpStatus.CREATED)
     }
 
@@ -51,17 +60,13 @@ class CategoryController{
 
     @PutMapping("{id}")
     fun update(@PathVariable id: UUID, @Valid @RequestBody categoryReq: CategoryReq): ResponseEntity<Category> {
-    //        val category = categories.first {it. id == id}
-    //        category.name = categoryReq.name
-    //        return category
+        if(categoryRepository.existsByNameAndIdNot(categoryReq.name, id))
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Category already exists")
 
-        //acha o obj
         val category = getCategory(id)
 
-        //recebe o obj passado
         val updateCategory = category.copy(name = categoryReq.name)
-        categories.remove(category)
-        categories.add(updateCategory)
+        categoryRepository.save(updateCategory)
         return ResponseEntity.ok(updateCategory)
 
     }
@@ -70,12 +75,12 @@ class CategoryController{
     fun delete(@PathVariable id: UUID): ResponseEntity<Category>{
         val category = getCategory(id)
 
-        categories.remove(category)
+        categoryRepository.delete(category)
         return ResponseEntity.noContent().build()
     }
 
     private fun getCategory(id: UUID): Category{
-        return categories.firstOrNull {it.id == id}
+        return categoryRepository.findByIdOrNull(id)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "category not found")
     }
 
