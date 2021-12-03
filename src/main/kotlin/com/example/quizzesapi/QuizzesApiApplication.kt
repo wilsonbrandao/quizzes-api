@@ -12,10 +12,3 @@ class QuizzesApiApplication
 fun main(args: Array<String>) {
 	runApplication<QuizzesApiApplication>(*args)
 }
-
-@RestController
-@RequestMapping("/test")
-class TestController {
-	@GetMapping
-	fun test() = "test"
-}
